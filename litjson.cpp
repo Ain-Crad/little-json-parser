@@ -14,6 +14,9 @@ ParseResultType LitJson::LitParseNull(LitContext* c, LitValue* v){
     }
 
     c->json += 4;
+    if(*c->json != '\0' && *c->json != ' ' && *c->json != '\t' && *c->json != '\n' && *c->json != '\r'){
+        return LIT_PARSE_INVALID_VALUE;
+    }
 
     LitParseWhitespace(c);
     if(*c->json != '\0'){
