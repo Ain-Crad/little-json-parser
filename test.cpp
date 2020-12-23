@@ -28,6 +28,22 @@ static void TestParseNull(){
     CHECK(LIT_NULL, lit.LitGetType(&v));
 }
 
+static void TestParseTrue(){
+    LitValue v;
+
+    v.type = LIT_FALSE;
+    CHECK(LIT_PARSE_OK, lit.LitParse(&v, "true"));
+    CHECK(LIT_TRUE, lit.LitGetType(&v));
+}
+
+static void TestParseFalse(){
+    LitValue v; 
+
+    v.type = LIT_TRUE;
+    CHECK(LIT_PARSE_OK, lit.LitParse(&v, "false"));
+    CHECK(LIT_FALSE, lit.LitGetType(&v));
+}
+
 static void TestParseExpectValue(){
     LitValue v;
 
@@ -54,6 +70,22 @@ static void TestParseInvalidValue(){
     v.type = LIT_FALSE;
     CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "?"));
     CHECK(LIT_NULL, lit.LitGetType(&v));
+
+    v.type = LIT_FALSE;
+    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "fale"));
+    CHECK(LIT_NULL, lit.LitGetType(&v));
+
+    v.type = LIT_FALSE; 
+    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "falsefalse"));
+    CHECK(LIT_NULL, lit.LitGetType(&v));
+
+    v.type = LIT_FALSE;
+    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "tre"));
+    CHECK(LIT_NULL, lit.LitGetType(&v));
+
+    v.type = LIT_FALSE;
+    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "truetrue"));
+    CHECK(LIT_NULL, lit.LitGetType(&v));
 }
 
 static void TestParseRootNotSingular(){
@@ -66,10 +98,20 @@ static void TestParseRootNotSingular(){
     v.type = LIT_FALSE;
     CHECK(LIT_PARSE_ROOT_NOT_SINGULAR, lit.LitParse(&v, "null x ?"));
     CHECK(LIT_NULL, lit.LitGetType(&v));
+
+    v.type = LIT_FALSE;
+    CHECK(LIT_PARSE_ROOT_NOT_SINGULAR, lit.LitParse(&v, "true null"));
+    CHECK(LIT_NULL, lit.LitGetType(&v));
+
+    v.type = LIT_FALSE;
+    CHECK(LIT_PARSE_ROOT_NOT_SINGULAR, lit.LitParse(&v, "false true"));
+    CHECK(LIT_NULL, lit.LitGetType(&v));
 }
 
 static void TestParse(){
     TestParseNull();
+    TestParseTrue();
+    TestParseFalse();
     TestParseExpectValue();
     TestParseInvalidValue();
     TestParseRootNotSingular();

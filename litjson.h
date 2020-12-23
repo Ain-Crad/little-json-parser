@@ -25,7 +25,10 @@ public:
     LitJson() = default;
 
     void LitParseWhitespace(LitContext *c);
+    ParseResultType LitParseRear(LitContext* c);
     ParseResultType LitParseNull(LitContext* c, LitValue* v);
+    ParseResultType LitParseTrue(LitContext* c, LitValue* v);
+    ParseResultType LitParseFalse(LitContext* c, LitValue* v);
     ParseResultType LitParseValue(LitContext* c, LitValue* v);
     ParseResultType LitParse(LitValue* v, const char* json);
     LitType LitGetType(const LitValue* v);
