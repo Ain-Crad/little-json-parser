@@ -1,5 +1,6 @@
-#include <iostream>
 #include <iomanip>
+#include <iostream>
+
 #include "litjson.h"
 
 static int main_ret = 0;
@@ -9,18 +10,17 @@ static LitJson lit;
 
 #define CHECK(expect, actual) Check(expect, actual, __FILE__, __LINE__)
 
-template<typename TypeExpect, typename TypeActual>
-static void Check(TypeExpect expect, TypeActual actual, const char *file_name, int line_num){
+template <typename TypeExpect, typename TypeActual>
+static void Check(TypeExpect expect, TypeActual actual, const char *file_name, int line_num) {
     ++test_count;
-    if(expect == actual){
+    if (expect == actual) {
         ++test_pass;
-    }else{
-        std::cerr << file_name << ":" << line_num
-                  << ": expect: " << expect << " actual: " << actual << std::endl;
+    } else {
+        std::cerr << file_name << ":" << line_num << ": expect: " << expect << " actual: " << actual << std::endl;
     }
 }
 
-static void TestParseNull(){
+static void TestParseNull() {
     LitValue v;
 
     v.type = LIT_FALSE;
@@ -28,7 +28,7 @@ static void TestParseNull(){
     CHECK(LIT_NULL, lit.LitGetType(&v));
 }
 
-static void TestParseTrue(){
+static void TestParseTrue() {
     LitValue v;
 
     v.type = LIT_FALSE;
@@ -36,15 +36,15 @@ static void TestParseTrue(){
     CHECK(LIT_TRUE, lit.LitGetType(&v));
 }
 
-static void TestParseFalse(){
-    LitValue v; 
+static void TestParseFalse() {
+    LitValue v;
 
     v.type = LIT_TRUE;
     CHECK(LIT_PARSE_OK, lit.LitParse(&v, "false"));
     CHECK(LIT_FALSE, lit.LitGetType(&v));
 }
 
-static void TestParseExpectValue(){
+static void TestParseExpectValue() {
     LitValue v;
 
     v.type = LIT_FALSE;
@@ -56,7 +56,7 @@ static void TestParseExpectValue(){
     CHECK(LIT_NULL, lit.LitGetType(&v));
 }
 
-static void TestParseInvalidValue(){
+static void TestParseInvalidValue() {
     LitValue v;
 
     v.type = LIT_FALSE;
@@ -75,7 +75,7 @@ static void TestParseInvalidValue(){
     CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "fale"));
     CHECK(LIT_NULL, lit.LitGetType(&v));
 
-    v.type = LIT_FALSE; 
+    v.type = LIT_FALSE;
     CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "falsefalse"));
     CHECK(LIT_NULL, lit.LitGetType(&v));
 
@@ -88,7 +88,7 @@ static void TestParseInvalidValue(){
     CHECK(LIT_NULL, lit.LitGetType(&v));
 }
 
-static void TestParseRootNotSingular(){
+static void TestParseRootNotSingular() {
     LitValue v;
 
     v.type = LIT_FALSE;
@@ -108,7 +108,7 @@ static void TestParseRootNotSingular(){
     CHECK(LIT_NULL, lit.LitGetType(&v));
 }
 
-static void TestParse(){
+static void TestParse() {
     TestParseNull();
     TestParseTrue();
     TestParseFalse();
@@ -117,13 +117,13 @@ static void TestParse(){
     TestParseRootNotSingular();
 }
 
-int main(){
+int main() {
     TestParse();
 
     std::cout << test_pass << "/" << test_count;
-    std::cout << std::fixed << std::setprecision(2)
-              << " (" << test_pass * 100.0 / test_count << "%) passed" << std::endl;
+    std::cout << std::fixed << std::setprecision(2) << " (" << test_pass * 100.0 / test_count << "%) passed"
+              << std::endl;
     std::cout << std::defaultfloat;
-    
+
     return main_ret;
 }
