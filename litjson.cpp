@@ -97,3 +97,8 @@ LitType LitJson::LitGetType(const LitValue* v) {
     assert(v != nullptr);
     return v->type;
 }
+
+double LitJson::LitGetNumber(const LitValue* v) {
+    assert(v != nullptr && v->type == LIT_NUMBER);
+    return v->n;
+}

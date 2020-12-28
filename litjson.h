@@ -4,6 +4,7 @@
 enum LitType { LIT_NULL, LIT_FALSE, LIT_TRUE, LIT_NUMBER, LIT_STRING, LIT_ARRAY, LIT_OBJECT };
 
 struct LitValue {
+    double n;
     LitType type;
 };
 
@@ -25,6 +26,7 @@ public:
     ParseResultType LitParseValue(LitContext* c, LitValue* v);
     ParseResultType LitParse(LitValue* v, const char* json);
     LitType LitGetType(const LitValue* v);
+    double LitGetNumber(const LitValue* v);
 };
 
 #endif

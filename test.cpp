@@ -9,15 +9,23 @@ static int test_pass = 0;
 static LitJson lit;
 
 #define CHECK(expect, actual) Check(expect, actual, __FILE__, __LINE__)
+#define CHECK_ERROR(error, json) CheckError(error, json, __FILE__, __LINE__)
 
-template <typename TypeExpect, typename TypeActual>
-static void Check(TypeExpect expect, TypeActual actual, const char *file_name, int line_num) {
+template <typename T>
+static void Check(T expect, T actual, const char *file_name, int line_num) {
     ++test_count;
     if (expect == actual) {
         ++test_pass;
     } else {
         std::cerr << file_name << ":" << line_num << ": expect: " << expect << " actual: " << actual << std::endl;
     }
+}
+
+static void CheckError(ParseResultType error, const char *json, const char *file_name, int line_num) {
+    LitValue v;
+    v.type = LIT_FALSE;
+    Check(error, lit.LitParse(&v, json), file_name, line_num);
+    Check(LIT_NULL, lit.LitGetType(&v), file_name, line_num);
 }
 
 static void TestParseNull() {
@@ -44,68 +52,27 @@ static void TestParseFalse() {
     CHECK(LIT_FALSE, lit.LitGetType(&v));
 }
 
+static void TestParseNumber() {}
+
 static void TestParseExpectValue() {
-    LitValue v;
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_EXPECT_VALUE, lit.LitParse(&v, ""));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_EXPECT_VALUE, lit.LitParse(&v, " "));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
+    CHECK_ERROR(LIT_PARSE_EXPECT_VALUE, "");
+    CHECK_ERROR(LIT_PARSE_EXPECT_VALUE, " ");
 }
 
 static void TestParseInvalidValue() {
-    LitValue v;
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "nul"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "nulll"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "?"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "fale"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "falsefalse"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "tre"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_INVALID_VALUE, lit.LitParse(&v, "truetrue"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "nul");
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "nulll");
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "?");
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "fale");
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "falsefalse");
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "tre");
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "truetrue");
 }
 
 static void TestParseRootNotSingular() {
-    LitValue v;
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_ROOT_NOT_SINGULAR, lit.LitParse(&v, "null x"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_ROOT_NOT_SINGULAR, lit.LitParse(&v, "null x ?"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_ROOT_NOT_SINGULAR, lit.LitParse(&v, "true null"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
-
-    v.type = LIT_FALSE;
-    CHECK(LIT_PARSE_ROOT_NOT_SINGULAR, lit.LitParse(&v, "false true"));
-    CHECK(LIT_NULL, lit.LitGetType(&v));
+    CHECK_ERROR(LIT_PARSE_ROOT_NOT_SINGULAR, "null x");
+    CHECK_ERROR(LIT_PARSE_ROOT_NOT_SINGULAR, "true null");
+    CHECK_ERROR(LIT_PARSE_ROOT_NOT_SINGULAR, "false true");
 }
 
 static void TestParse() {
