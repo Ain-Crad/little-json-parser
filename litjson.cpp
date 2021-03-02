@@ -10,7 +10,7 @@
 // assignment && copy-control
 LitValue& LitValue::operator=(bool b) {
     if (type == LIT_STRING) str.~basic_string();
-    if (type == LIT_ARRAY) arr.~vector();
+    if (type == LIT_ARRAY) arr.~vector<LitValue>();
 
     type = (b ? LIT_TRUE : LIT_FALSE);
     return *this;
@@ -18,7 +18,7 @@ LitValue& LitValue::operator=(bool b) {
 
 LitValue& LitValue::operator=(double d) {
     if (type == LIT_STRING) str.~basic_string();
-    if (type == LIT_ARRAY) arr.~vector();
+    if (type == LIT_ARRAY) arr.~vector<LitValue>();
 
     n = d;
     type = LIT_NUMBER;
@@ -26,7 +26,7 @@ LitValue& LitValue::operator=(double d) {
 }
 
 LitValue& LitValue::operator=(const std::string& s) {
-    if (type == LIT_ARRAY) arr.~vector();
+    if (type == LIT_ARRAY) arr.~vector<LitValue>();
 
     if (type == LIT_STRING) {
         str = s;
@@ -37,15 +37,15 @@ LitValue& LitValue::operator=(const std::string& s) {
     return *this;
 }
 
-LitValue& LitValue::operator=(const std::vector<std::shared_ptr<LitValue>>& a) {
+LitValue& LitValue::operator=(const std::vector<LitValue>& a) {
     if (type == LIT_STRING) str.~basic_string();
 
     if (type == LIT_ARRAY) {
         arr = a;
     } else {
-        new (&arr) std::vector<std::shared_ptr<LitValue>>(a);
+        new (&arr) std::vector<LitValue>(a);
     }
-    type = LIT_STRING;
+    type = LIT_ARRAY;
     return *this;
 }
 
@@ -53,13 +53,13 @@ void LitValue::CopyUnion(const LitValue& v) {
     switch (v.type) {
         case LIT_NUMBER: n = v.n; break;
         case LIT_STRING: new (&str) std::string(v.str); break;
-        case LIT_ARRAY: new (&arr) std::vector<std::shared_ptr<LitValue>>(v.arr); break;
+        case LIT_ARRAY: new (&arr) std::vector<LitValue>(v.arr); break;
     }
 }
 
 LitValue& LitValue::operator=(const LitValue& v) {
     if (type == LIT_STRING && v.type != LIT_STRING) str.~basic_string();
-    if (type == LIT_ARRAY && v.type != LIT_ARRAY) arr.~vector();
+    if (type == LIT_ARRAY && v.type != LIT_ARRAY) arr.~vector<LitValue>();
 
     if (type == LIT_STRING && v.type == LIT_STRING) {
         str = v.str;
@@ -247,6 +247,37 @@ void LitJson::LitEncodeUTF8(LitContext* c, unsigned int u) {
     }
 }
 
+ParseResultType LitJson::LitParseArray(LitContext* c, LitValue* v) {
+    assert(c->json[0] == '[');
+    ++c->json;
+    LitParseWhitespace(c);
+    if (*c->json == ']') {
+        ++c->json;
+        v->type = LIT_ARRAY;
+        return LIT_PARSE_OK;
+    }
+
+    std::vector<LitValue> aux;
+    ParseResultType res = LIT_PARSE_INVALID_VALUE;
+    while (true) {
+        LitValue t;
+        if ((res = LitParseValue(c, &t)) != LIT_PARSE_OK) return res;
+
+        aux.push_back(t);
+        LitParseWhitespace(c);
+        if (*c->json == ',') {
+            ++c->json;
+            LitParseWhitespace(c);
+        } else if (*c->json == ']') {
+            ++c->json;
+            lit_set_array(v, aux);
+            return LIT_PARSE_OK;
+        } else {
+            return LIT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET;
+        }
+    }
+}
+
 ParseResultType LitJson::LitParseValue(LitContext* c, LitValue* v) {
     switch (*c->json) {
         case 'n': return LitParseNull(c, v);
@@ -254,6 +285,7 @@ ParseResultType LitJson::LitParseValue(LitContext* c, LitValue* v) {
         case 'f': return LitParseFalse(c, v);
         case '\"': return LitParseString(c, v);
         case '\0': return LIT_PARSE_EXPECT_VALUE;
+        case '[': return LitParseArray(c, v);
         default: return LitParseNumber(c, v);
     }
 }
@@ -262,7 +294,6 @@ ParseResultType LitJson::LitParse(LitValue* v, const char* json) {
     LitContext c;
     assert(v != nullptr);
     c.json = json;
-    v->type = LIT_NULL;
     LitParseWhitespace(&c);
     ParseResultType res = LitParseValue(&c, v);
     if (res == LIT_PARSE_OK) {
@@ -271,45 +302,65 @@ ParseResultType LitJson::LitParse(LitValue* v, const char* json) {
             v->type = LIT_NULL;
             res = LIT_PARSE_ROOT_NOT_SINGULAR;
         }
+    } else {
+        v->type = LIT_NULL;
     }
     return res;
 }
 
 // set and get
-LitType LitJson::lit_get_type(const LitValue* v) {
-    assert(v != nullptr);
-    return v->type;
-}
+LitType LitJson::lit_get_type(const LitValue& v) { return v.type; }
 
 void LitJson::lit_set_null(LitValue* v) {
     assert(v != nullptr);
     if (v->type == LIT_STRING) v->str.~basic_string();
+    if (v->type == LIT_ARRAY) v->arr.~vector<LitValue>();
     v->type = LIT_NULL;
 }
 
-bool LitJson::lit_get_boolean(const LitValue* v) {
-    assert(v != nullptr && (v->type == LIT_TRUE || v->type == LIT_FALSE));
-    return v->type;
+bool LitJson::lit_get_boolean(const LitValue& v) {
+    assert(v.type == LIT_TRUE || v.type == LIT_FALSE);
+    return v.type;
 }
 void LitJson::lit_set_boolean(LitValue* v, bool b) {
     assert(v != nullptr);
     *v = b;
 }
 
-double LitJson::lit_get_number(const LitValue* v) {
-    assert(v != nullptr && v->type == LIT_NUMBER);
-    return v->n;
+double LitJson::lit_get_number(const LitValue& v) {
+    assert(v.type == LIT_NUMBER);
+    return v.n;
 }
 void LitJson::lit_set_number(LitValue* v, double n) {
     assert(v != nullptr);
     *v = n;
 }
 
-std::string LitJson::lit_get_string(const LitValue* v) {
-    assert(v != nullptr && v->type == LIT_STRING);
-    return v->str;
+std::string LitJson::lit_get_string(const LitValue& v) {
+    assert(v.type == LIT_STRING);
+    return v.str;
 }
 void LitJson::lit_set_string(LitValue* v, const std::string& s) {
     assert(v != nullptr);
     *v = s;
+}
+
+LitValue& LitJson::lit_get_array_element(LitValue& v, size_t index) {
+    assert(v.type == LIT_ARRAY);
+    assert(index < v.arr.size());
+    return v.arr[index];
+}
+const LitValue& LitJson::lit_get_array_element(const LitValue& v, size_t index) {
+    assert(v.type == LIT_ARRAY);
+    assert(index < v.arr.size());
+    return v.arr[index];
+}
+
+size_t LitJson::lit_get_array_size(const LitValue& v) {
+    assert(v.type == LIT_ARRAY);
+    return v.arr.size();
+}
+void LitJson::lit_set_array(LitValue* v, const std::vector<LitValue>& a) {
+    assert(v != nullptr);
+    *v = a;
 }

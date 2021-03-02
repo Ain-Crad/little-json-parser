@@ -12,6 +12,7 @@ static LitJson lit;
 #define CHECK_ERROR(error, json) CheckError(error, json, __FILE__, __LINE__)
 #define CHECK_NUMBER(expect, json) CheckNumber(expect, json, __FILE__, __LINE__)
 #define CHECK_STRING(expect, json) CheckString(expect, json, __FILE__, __LINE__)
+#define CHECK_ARRAY(expect, json) CheckArray(expect, json, __FILE__, __LINE__);
 
 template <typename T>
 static void CheckEquality(T expect, T actual, const char *file_name, int line_num) {
@@ -28,7 +29,7 @@ static void CheckError(ParseResultType error, const char *json, const char *file
     lit.lit_set_boolean(&v, false);
 
     CheckEquality(error, lit.LitParse(&v, json), file_name, line_num);
-    CheckEquality(LIT_NULL, lit.lit_get_type(&v), file_name, line_num);
+    CheckEquality(LIT_NULL, lit.lit_get_type(v), file_name, line_num);
 }
 
 static void CheckNumber(double expect, const char *json, const char *file_name, int line_num) {
@@ -36,17 +37,17 @@ static void CheckNumber(double expect, const char *json, const char *file_name, 
     lit.lit_set_null(&v);
 
     CheckEquality(LIT_PARSE_OK, lit.LitParse(&v, json), file_name, line_num);
-    CheckEquality(LIT_NUMBER, lit.lit_get_type(&v), file_name, line_num);
-    CheckEquality(expect, lit.lit_get_number(&v), file_name, line_num);
+    CheckEquality(LIT_NUMBER, lit.lit_get_type(v), file_name, line_num);
+    CheckEquality(expect, lit.lit_get_number(v), file_name, line_num);
 }
 
-static void CheckString(std::string expect, const char *json, const char *file_name, int line_num) {
+static void CheckString(const std::string &expect, const char *json, const char *file_name, int line_num) {
     LitValue v;
     lit.lit_set_null(&v);
 
     CheckEquality(LIT_PARSE_OK, lit.LitParse(&v, json), file_name, line_num);
-    CheckEquality(LIT_STRING, lit.lit_get_type(&v), file_name, line_num);
-    CheckEquality(expect, lit.lit_get_string(&v), file_name, line_num);
+    CheckEquality(LIT_STRING, lit.lit_get_type(v), file_name, line_num);
+    CheckEquality(expect, lit.lit_get_string(v), file_name, line_num);
 }
 
 static void TestParseNull() {
@@ -54,7 +55,7 @@ static void TestParseNull() {
     lit.lit_set_boolean(&v, false);
 
     CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "null"));
-    CHECK_EQ(LIT_NULL, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_NULL, lit.lit_get_type(v));
 }
 
 static void TestParseTrue() {
@@ -62,7 +63,7 @@ static void TestParseTrue() {
     lit.lit_set_boolean(&v, false);
 
     CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "true"));
-    CHECK_EQ(LIT_TRUE, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_TRUE, lit.lit_get_type(v));
 }
 
 static void TestParseFalse() {
@@ -70,7 +71,7 @@ static void TestParseFalse() {
     lit.lit_set_boolean(&v, true);
 
     CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "false"));
-    CHECK_EQ(LIT_FALSE, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_FALSE, lit.lit_get_type(v));
 }
 
 static void TestParseNumber() {
@@ -112,6 +113,35 @@ static void TestParseString() {
     CHECK_STRING("\xE2\x82\xAC", "\"\\u20AC\"");
     CHECK_STRING("\xF0\x9D\x84\x9E", "\"\\uD834\\uDD1E\"");
     CHECK_STRING("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\"");
+}
+
+static void TestParseArray() {
+    LitValue v;
+
+    lit.lit_set_null(&v);
+    CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "[]"));
+    CHECK_EQ(LIT_ARRAY, lit.lit_get_type(v));
+    CHECK_EQ(static_cast<size_t>(0), lit.lit_get_array_size(v));
+
+    lit.lit_set_null(&v);
+    CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "[null,false,true,123,\"abc\"]"));
+    CHECK_EQ(LIT_ARRAY, lit.lit_get_type(v));
+    CHECK_EQ(static_cast<size_t>(5), lit.lit_get_array_size(v));
+    CHECK_EQ(LIT_NULL, lit.lit_get_type(lit.lit_get_array_element(v, 0)));
+    CHECK_EQ(LIT_FALSE, lit.lit_get_type(lit.lit_get_array_element(v, 1)));
+    CHECK_EQ(LIT_TRUE, lit.lit_get_type(lit.lit_get_array_element(v, 2)));
+    CHECK_EQ(LIT_NUMBER, lit.lit_get_type(lit.lit_get_array_element(v, 3)));
+    CHECK_EQ(LIT_STRING, lit.lit_get_type(lit.lit_get_array_element(v, 4)));
+
+    lit.lit_set_null(&v);
+    CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "[ null , false , true , 123 , \"abc\" ]"));
+    CHECK_EQ(LIT_ARRAY, lit.lit_get_type(v));
+    CHECK_EQ(static_cast<size_t>(5), lit.lit_get_array_size(v));
+    CHECK_EQ(LIT_NULL, lit.lit_get_type(lit.lit_get_array_element(v, 0)));
+    CHECK_EQ(LIT_FALSE, lit.lit_get_type(lit.lit_get_array_element(v, 1)));
+    CHECK_EQ(LIT_TRUE, lit.lit_get_type(lit.lit_get_array_element(v, 2)));
+    CHECK_EQ(LIT_NUMBER, lit.lit_get_type(lit.lit_get_array_element(v, 3)));
+    CHECK_EQ(LIT_STRING, lit.lit_get_type(lit.lit_get_array_element(v, 4)));
 }
 
 static void TestParseExpectValue() {
@@ -197,30 +227,30 @@ static void TestAccessNull() {
     LitValue v;
     lit.lit_set_string(&v, "access null");
     lit.lit_set_null(&v);
-    CHECK_EQ(LIT_NULL, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_NULL, lit.lit_get_type(v));
 }
 
 static void TestAccessBoolean() {
     LitValue v;
     lit.lit_set_string(&v, "access boolean");
     lit.lit_set_boolean(&v, true);
-    CHECK_EQ(LIT_TRUE, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_TRUE, lit.lit_get_type(v));
     lit.lit_set_boolean(&v, false);
-    CHECK_EQ(LIT_FALSE, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_FALSE, lit.lit_get_type(v));
 }
 
 static void TestAccessNumber() {
     LitValue v;
     lit.lit_set_string(&v, "access number");
     lit.lit_set_number(&v, 100.1);
-    CHECK_EQ(LIT_NUMBER, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_NUMBER, lit.lit_get_type(v));
 }
 
 static void TestAccessString() {
     LitValue v;
     lit.lit_set_null(&v);
     lit.lit_set_string(&v, "access string");
-    CHECK_EQ(LIT_STRING, lit.lit_get_type(&v));
+    CHECK_EQ(LIT_STRING, lit.lit_get_type(v));
 }
 
 static void TestParse() {
@@ -230,6 +260,7 @@ static void TestParse() {
     TestParseFalse();
     TestParseNumber();
     TestParseString();
+    TestParseArray();
 
     // test error
     TestParseExpectValue();

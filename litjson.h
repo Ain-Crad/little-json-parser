@@ -1,7 +1,6 @@
 #ifndef LITJSON_H_
 #define LITJSON_H_
 
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -24,14 +23,14 @@ public:
     LitValue& operator=(bool);
     LitValue& operator=(double);
     LitValue& operator=(const std::string&);
-    LitValue& operator=(const std::vector<std::shared_ptr<LitValue>>& a);
+    LitValue& operator=(const std::vector<LitValue>&);
 
 private:
     void CopyUnion(const LitValue&);
 
     union {
         double n;
-        std::vector<std::shared_ptr<LitValue>> arr;
+        std::vector<LitValue> arr;
         std::string str;
     };
     LitType type;
@@ -52,7 +51,8 @@ enum ParseResultType {
     LIT_PARSE_INVALID_STRING_ESCAPE,
     LIT_PARSE_INVALID_STRING_CHAR,
     LIT_PARSE_INVALID_UNICODE_HEX,
-    LIT_PARSE_INVALID_UNICODE_SURROGATE
+    LIT_PARSE_INVALID_UNICODE_SURROGATE,
+    LIT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET
 };
 
 class LitJson {
@@ -61,20 +61,24 @@ public:
 
     ParseResultType LitParse(LitValue* v, const char* json);
 
-    LitType lit_get_type(const LitValue* v);
+    LitType lit_get_type(const LitValue& v);
 
     void lit_set_null(LitValue* v);
 
-    bool lit_get_boolean(const LitValue* v);
+    bool lit_get_boolean(const LitValue& v);
     void lit_set_boolean(LitValue* v, bool b);
 
-    double lit_get_number(const LitValue* v);
+    double lit_get_number(const LitValue& v);
     void lit_set_number(LitValue* v, double n);
 
-    std::string lit_get_string(const LitValue* v);
+    std::string lit_get_string(const LitValue& v);
     void lit_set_string(LitValue* v, const std::string& s);
 
-    LitValue* lit_get_array_element(const LitValue* v, size_t index);
+    LitValue& lit_get_array_element(LitValue& v, size_t index);
+    const LitValue& lit_get_array_element(const LitValue& v, size_t index);
+
+    size_t lit_get_array_size(const LitValue& v);
+    void lit_set_array(LitValue* v, const std::vector<LitValue>& a);
 
 private:
     void LitParseWhitespace(LitContext* c);
@@ -85,6 +89,7 @@ private:
     ParseResultType LitParseValue(LitContext* c, LitValue* v);
     ParseResultType LitParseNumber(LitContext* c, LitValue* v);
     ParseResultType LitParseString(LitContext* c, LitValue* v);
+    ParseResultType LitParseArray(LitContext* c, LitValue* v);
     const char* LitParseUnicode(const char* p, unsigned int* u);
     void LitEncodeUTF8(LitContext* c, unsigned int u);
 };
