@@ -1,7 +1,9 @@
 #ifndef LITJSON_H_
 #define LITJSON_H_
 
+#include <memory>
 #include <string>
+#include <vector>
 
 class LitJson;
 
@@ -15,18 +17,21 @@ public:
     LitValue(const LitValue& v) : type(v.type) { CopyUnion(v); }
     ~LitValue() {
         if (type == LIT_STRING) str.~basic_string();
+        if (type == LIT_ARRAY) arr.~vector();
     }
 
     LitValue& operator=(const LitValue& v);
     LitValue& operator=(bool);
     LitValue& operator=(double);
     LitValue& operator=(const std::string&);
+    LitValue& operator=(const std::vector<std::shared_ptr<LitValue>>& a);
 
 private:
     void CopyUnion(const LitValue&);
 
     union {
         double n;
+        std::vector<std::shared_ptr<LitValue>> arr;
         std::string str;
     };
     LitType type;
@@ -68,6 +73,8 @@ public:
 
     std::string lit_get_string(const LitValue* v);
     void lit_set_string(LitValue* v, const std::string& s);
+
+    LitValue* lit_get_array_element(const LitValue* v, size_t index);
 
 private:
     void LitParseWhitespace(LitContext* c);

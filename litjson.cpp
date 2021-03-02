@@ -10,18 +10,24 @@
 // assignment && copy-control
 LitValue& LitValue::operator=(bool b) {
     if (type == LIT_STRING) str.~basic_string();
+    if (type == LIT_ARRAY) arr.~vector();
+
     type = (b ? LIT_TRUE : LIT_FALSE);
     return *this;
 }
 
 LitValue& LitValue::operator=(double d) {
     if (type == LIT_STRING) str.~basic_string();
+    if (type == LIT_ARRAY) arr.~vector();
+
     n = d;
     type = LIT_NUMBER;
     return *this;
 }
 
 LitValue& LitValue::operator=(const std::string& s) {
+    if (type == LIT_ARRAY) arr.~vector();
+
     if (type == LIT_STRING) {
         str = s;
     } else {
@@ -31,17 +37,34 @@ LitValue& LitValue::operator=(const std::string& s) {
     return *this;
 }
 
+LitValue& LitValue::operator=(const std::vector<std::shared_ptr<LitValue>>& a) {
+    if (type == LIT_STRING) str.~basic_string();
+
+    if (type == LIT_ARRAY) {
+        arr = a;
+    } else {
+        new (&arr) std::vector<std::shared_ptr<LitValue>>(a);
+    }
+    type = LIT_STRING;
+    return *this;
+}
+
 void LitValue::CopyUnion(const LitValue& v) {
     switch (v.type) {
         case LIT_NUMBER: n = v.n; break;
         case LIT_STRING: new (&str) std::string(v.str); break;
+        case LIT_ARRAY: new (&arr) std::vector<std::shared_ptr<LitValue>>(v.arr); break;
     }
 }
 
 LitValue& LitValue::operator=(const LitValue& v) {
     if (type == LIT_STRING && v.type != LIT_STRING) str.~basic_string();
+    if (type == LIT_ARRAY && v.type != LIT_ARRAY) arr.~vector();
+
     if (type == LIT_STRING && v.type == LIT_STRING) {
         str = v.str;
+    } else if (type == LIT_ARRAY && v.type == LIT_ARRAY) {
+        arr = v.arr;
     } else {
         CopyUnion(v);
     }

@@ -169,7 +169,29 @@ static void TestParseInvalidStringChar() {
     CHECK_ERROR(LIT_PARSE_INVALID_STRING_CHAR, "\"\x1f\"");
 }
 
-// static void TestParseInValidUnicode
+static void TestParseInValidUnicodeHex() {
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u0\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u01\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u012\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u/000\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\uG000\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u0/00\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u0G00\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u00/0\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u00G0\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u000/\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u000G\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u 123\"");
+}
+
+// static void TestParseInvalidUnicodeSurrogate() {
+//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\"");
+//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uDBFF\"");
+//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\\\\"");
+//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uDBFF\"");
+//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
+// }
 
 static void TestAccessNull() {
     LitValue v;
@@ -202,11 +224,14 @@ static void TestAccessString() {
 }
 
 static void TestParse() {
+    // test type
     TestParseNull();
     TestParseTrue();
     TestParseFalse();
     TestParseNumber();
     TestParseString();
+
+    // test error
     TestParseExpectValue();
     TestParseInvalidValue();
     TestParseRootNotSingular();
@@ -214,7 +239,10 @@ static void TestParse() {
     TestParseMissingQuotationMark();
     TestParseInvalidStringEscape();
     TestParseInvalidStringChar();
+    TestParseInValidUnicodeHex();
+    // TestParseInvalidUnicodeSurrogate();
 
+    // test access/memory management
     TestAccessNull();
     TestAccessBoolean();
     TestAccessNumber();
