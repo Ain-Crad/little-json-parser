@@ -134,21 +134,26 @@ ParseResultType LitJson::LitParseNumber(LitContext* c, LitValue* v) {
     return LIT_PARSE_OK;
 }
 
+ParseResultType DealStringError(ParseResultType t, LitContext* c) {
+    c->str.clear();
+    return t;
+}
+
 ParseResultType LitJson::LitParseString(LitContext* c, LitValue* v) {
     assert(c->json[0] == '\"');
+    unsigned uh = 0, ul = 0;
     const char* p = c->json;
     ++p;
     while (true) {
-        char ch = *p;
+        char ch = *p++;
         switch (ch) {
             case '\"':
                 lit_set_string(v, c->str);
                 c->str.clear();
-                c->json = ++p;
+                c->json = p;
                 return LIT_PARSE_OK;
             case '\\':
-                ++p;
-                switch (*p) {
+                switch (*p++) {
                     case '\"': c->str.push_back('\"'); break;
                     case '\\': c->str.push_back('\\'); break;
                     case '/': c->str.push_back('/'); break;
@@ -157,18 +162,65 @@ ParseResultType LitJson::LitParseString(LitContext* c, LitValue* v) {
                     case 'n': c->str.push_back('\n'); break;
                     case 'r': c->str.push_back('\r'); break;
                     case 't': c->str.push_back('\t'); break;
+                    case 'u':
+                        if (!(p = LitParseUnicode(p, &uh))) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
+                        if (uh >= 0xDC00 && uh <= 0xDFFF) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
+                        if (uh >= 0xD800 && uh <= 0xD8FF) {
+                            if (*p++ != '\\') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
+                            if (*p++ != 'u') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
+                            if (!(p = LitParseUnicode(p, &ul)))
+                                return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
+                            if (ul < 0xDC00 || ul > 0xDFFF)
+                                return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
+                            uh = 0x10000 + (((uh - 0xD800) << 10) | (ul - 0xDC00));
+                        }
+                        LitEncodeUTF8(c, uh);
+                        break;
                     default: return LIT_PARSE_INVALID_STRING_ESCAPE;
                 }
                 break;
-            case '\0': c->str.clear(); return LIT_PARSE_MISS_QUOTATION_MARK;
+            case '\0': return DealStringError(LIT_PARSE_MISS_QUOTATION_MARK, c);
             default:
-                if (static_cast<unsigned char>(ch) < 0x20) {
-                    c->str.clear();
-                    return LIT_PARSE_INVALID_STRING_CHAR;
-                }
+                if (static_cast<unsigned char>(ch) < 0x20) return DealStringError(LIT_PARSE_INVALID_STRING_CHAR, c);
                 c->str.push_back(ch);
         }
-        ++p;
+    }
+}
+
+const char* LitJson::LitParseUnicode(const char* p, unsigned int* u) {
+    *u = 0;
+    for (int i = 0; i < 4; ++i) {
+        char ch = *p++;
+        *u <<= 4;
+        if (ch >= '0' && ch <= '9') {
+            *u |= ch - '0';
+        } else if (ch >= 'A' && ch <= 'F') {
+            *u |= ch - 'A' + 10;
+        } else if (ch >= 'a' && ch <= 'f') {
+            *u |= ch - 'a' + 10;
+        } else {
+            return nullptr;
+        }
+    }
+    return p;
+}
+
+void LitJson::LitEncodeUTF8(LitContext* c, unsigned int u) {
+    if (u <= 0x7F) {
+        c->str.push_back(u);
+    } else if (u <= 0x7FF) {
+        c->str.push_back(0xC0 | ((u >> 6) & 0xFF));
+        c->str.push_back(0x80 | (u & 0x3F));
+    } else if (u <= 0xFFFF) {
+        c->str.push_back(0xE0 | ((u >> 12) & 0xFF));
+        c->str.push_back(0x80 | ((u >> 6) & 0x3F));
+        c->str.push_back(0x80 | (u & 0x3F));
+    } else {
+        assert(u <= 0x10FFFF);
+        c->str.push_back(0xF0 | ((u >> 18) & 0xFF));
+        c->str.push_back(0x80 | ((u >> 12) & 0x3F));
+        c->str.push_back(0x80 | ((u >> 6) & 0x3F));
+        c->str.push_back(0x80 | (u & 0x3F));
     }
 }
 

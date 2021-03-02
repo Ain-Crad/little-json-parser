@@ -45,7 +45,9 @@ enum ParseResultType {
     LIT_PARSE_NUMBER_TOO_BIG,
     LIT_PARSE_MISS_QUOTATION_MARK,
     LIT_PARSE_INVALID_STRING_ESCAPE,
-    LIT_PARSE_INVALID_STRING_CHAR
+    LIT_PARSE_INVALID_STRING_CHAR,
+    LIT_PARSE_INVALID_UNICODE_HEX,
+    LIT_PARSE_INVALID_UNICODE_SURROGATE
 };
 
 class LitJson {
@@ -76,6 +78,8 @@ private:
     ParseResultType LitParseValue(LitContext* c, LitValue* v);
     ParseResultType LitParseNumber(LitContext* c, LitValue* v);
     ParseResultType LitParseString(LitContext* c, LitValue* v);
+    const char* LitParseUnicode(const char* p, unsigned int* u);
+    void LitEncodeUTF8(LitContext* c, unsigned int u);
 };
 
 #endif

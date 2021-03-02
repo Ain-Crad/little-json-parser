@@ -105,6 +105,13 @@ static void TestParseString() {
     CHECK_STRING("", "\"\"");
     CHECK_STRING("Hello World", "\"Hello World\"");
     CHECK_STRING("Hello\nWorld", "\"Hello\\nWorld\"");
+    CHECK_STRING("\" \\ / \b \f \n \r \t", "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"");
+    // CHECK_STRING("Hello\0World", "\"Hello\\u0000World\""); to be fixed
+    CHECK_STRING("\x24", "\"\\u0024\"");
+    CHECK_STRING("\xC2\xA2", "\"\\u00A2\"");
+    CHECK_STRING("\xE2\x82\xAC", "\"\\u20AC\"");
+    CHECK_STRING("\xF0\x9D\x84\x9E", "\"\\uD834\\uDD1E\"");
+    CHECK_STRING("\xF0\x9D\x84\x9E", "\"\\ud834\\udd1e\"");
 }
 
 static void TestParseExpectValue() {
@@ -161,6 +168,8 @@ static void TestParseInvalidStringChar() {
     CHECK_ERROR(LIT_PARSE_INVALID_STRING_CHAR, "\"\x01\"");
     CHECK_ERROR(LIT_PARSE_INVALID_STRING_CHAR, "\"\x1f\"");
 }
+
+// static void TestParseInValidUnicode
 
 static void TestAccessNull() {
     LitValue v;
