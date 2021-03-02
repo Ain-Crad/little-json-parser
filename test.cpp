@@ -185,13 +185,13 @@ static void TestParseInValidUnicodeHex() {
     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_HEX, "\"\\u 123\"");
 }
 
-// static void TestParseInvalidUnicodeSurrogate() {
-//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\"");
-//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uDBFF\"");
-//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\\\\"");
-//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uDBFF\"");
-//     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
-// }
+static void TestParseInvalidUnicodeSurrogate() {
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uDBFF\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\\\\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uDBFF\"");
+    CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
+}
 
 static void TestAccessNull() {
     LitValue v;
@@ -240,7 +240,7 @@ static void TestParse() {
     TestParseInvalidStringEscape();
     TestParseInvalidStringChar();
     TestParseInValidUnicodeHex();
-    // TestParseInvalidUnicodeSurrogate();
+    TestParseInvalidUnicodeSurrogate();
 
     // test access/memory management
     TestAccessNull();

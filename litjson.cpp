@@ -188,7 +188,7 @@ ParseResultType LitJson::LitParseString(LitContext* c, LitValue* v) {
                     case 'u':
                         if (!(p = LitParseUnicode(p, &uh))) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
                         if (uh >= 0xDC00 && uh <= 0xDFFF) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
-                        if (uh >= 0xD800 && uh <= 0xD8FF) {
+                        if (uh >= 0xD800 && uh <= 0xDBFF) {
                             if (*p++ != '\\') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
                             if (*p++ != 'u') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
                             if (!(p = LitParseUnicode(p, &ul)))
