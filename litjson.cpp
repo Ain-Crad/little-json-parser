@@ -8,17 +8,33 @@
 #include <iostream>
 
 // assignment && copy-control
+LitValue& LitValue::operator=(const LitValue& v) {
+    if (type == LIT_STRING && v.type != LIT_STRING) str.~basic_string();
+    if (type == LIT_ARRAY && v.type != LIT_ARRAY) arr.~vector<LitValue>();
+    if (type == LIT_OBJECT && v.type != LIT_OBJECT) obj.~vector<std::pair<std::string, LitValue>>();
+
+    if (type == LIT_STRING && v.type == LIT_STRING) {
+        str = v.str;
+    } else if (type == LIT_ARRAY && v.type == LIT_ARRAY) {
+        arr = v.arr;
+    } else if (type == LIT_OBJECT && v.type == LIT_OBJECT) {
+        obj = v.obj;
+    } else {
+        CopyUnion(v);
+    }
+    type = v.type;
+    return *this;
+}
+
 LitValue& LitValue::operator=(bool b) {
-    if (type == LIT_STRING) str.~basic_string();
-    if (type == LIT_ARRAY) arr.~vector<LitValue>();
+    UnionFree();
 
     type = (b ? LIT_TRUE : LIT_FALSE);
     return *this;
 }
 
 LitValue& LitValue::operator=(double d) {
-    if (type == LIT_STRING) str.~basic_string();
-    if (type == LIT_ARRAY) arr.~vector<LitValue>();
+    UnionFree();
 
     n = d;
     type = LIT_NUMBER;
@@ -26,11 +42,10 @@ LitValue& LitValue::operator=(double d) {
 }
 
 LitValue& LitValue::operator=(const std::string& s) {
-    if (type == LIT_ARRAY) arr.~vector<LitValue>();
-
     if (type == LIT_STRING) {
         str = s;
     } else {
+        UnionFree();
         new (&str) std::string(s);
     }
     type = LIT_STRING;
@@ -38,14 +53,24 @@ LitValue& LitValue::operator=(const std::string& s) {
 }
 
 LitValue& LitValue::operator=(const std::vector<LitValue>& a) {
-    if (type == LIT_STRING) str.~basic_string();
-
     if (type == LIT_ARRAY) {
         arr = a;
     } else {
+        UnionFree();
         new (&arr) std::vector<LitValue>(a);
     }
     type = LIT_ARRAY;
+    return *this;
+}
+
+LitValue& LitValue::operator=(const Obj& o) {
+    if (type == LIT_OBJECT) {
+        obj = o;
+    } else {
+        UnionFree();
+        new (&obj) Obj(o);
+    }
+    type = LIT_OBJECT;
     return *this;
 }
 
@@ -54,22 +79,14 @@ void LitValue::CopyUnion(const LitValue& v) {
         case LIT_NUMBER: n = v.n; break;
         case LIT_STRING: new (&str) std::string(v.str); break;
         case LIT_ARRAY: new (&arr) std::vector<LitValue>(v.arr); break;
+        case LIT_OBJECT: new (&obj) Obj(v.obj); break;
     }
 }
 
-LitValue& LitValue::operator=(const LitValue& v) {
-    if (type == LIT_STRING && v.type != LIT_STRING) str.~basic_string();
-    if (type == LIT_ARRAY && v.type != LIT_ARRAY) arr.~vector<LitValue>();
-
-    if (type == LIT_STRING && v.type == LIT_STRING) {
-        str = v.str;
-    } else if (type == LIT_ARRAY && v.type == LIT_ARRAY) {
-        arr = v.arr;
-    } else {
-        CopyUnion(v);
-    }
-    type = v.type;
-    return *this;
+void LitValue::UnionFree() {
+    if (type == LIT_STRING) str.~basic_string();
+    if (type == LIT_ARRAY) arr.~vector<LitValue>();
+    if (type == LIT_OBJECT) obj.~vector<std::pair<std::string, LitValue>>();
 }
 
 // parse
@@ -80,7 +97,7 @@ void LitJson::LitParseWhitespace(LitContext* c) {
 }
 
 ParseResultType LitJson::LitParseNull(LitContext* c, LitValue* v) {
-    assert(c->json[0] == 'n');
+    assert(c != nullptr && c->json[0] == 'n');
     if (c->json[1] != 'u' || c->json[2] != 'l' || c->json[3] != 'l') {
         return LIT_PARSE_INVALID_VALUE;
     }
@@ -92,7 +109,7 @@ ParseResultType LitJson::LitParseNull(LitContext* c, LitValue* v) {
 }
 
 ParseResultType LitJson::LitParseTrue(LitContext* c, LitValue* v) {
-    assert(c->json[0] == 't');
+    assert(c != nullptr && c->json[0] == 't');
     if (c->json[1] != 'r' || c->json[2] != 'u' || c->json[3] != 'e') {
         return LIT_PARSE_INVALID_VALUE;
     }
@@ -104,7 +121,7 @@ ParseResultType LitJson::LitParseTrue(LitContext* c, LitValue* v) {
 }
 
 ParseResultType LitJson::LitParseFalse(LitContext* c, LitValue* v) {
-    assert(c->json[0] == 'f');
+    assert(c != nullptr && c->json[0] == 'f');
     if (c->json[1] != 'a' || c->json[2] != 'l' || c->json[3] != 's' || c->json[4] != 'e') {
         return LIT_PARSE_INVALID_VALUE;
     }
@@ -157,55 +174,61 @@ ParseResultType LitJson::LitParseNumber(LitContext* c, LitValue* v) {
     return LIT_PARSE_OK;
 }
 
-ParseResultType DealStringError(ParseResultType t, LitContext* c) {
-    c->str.clear();
+ParseResultType DealStringError(ParseResultType t, std::string* cache) {
+    cache->clear();
     return t;
 }
 
 ParseResultType LitJson::LitParseString(LitContext* c, LitValue* v) {
-    assert(c->json[0] == '\"');
+    ParseResultType res;
+    std::string cache;
+    if ((res = LitParseStringRaw(c, &cache)) == LIT_PARSE_OK) {
+        lit_set_string(v, cache);
+    }
+    return res;
+}
+
+ParseResultType LitJson::LitParseStringRaw(LitContext* c, std::string* cache) {
+    assert(c != nullptr && c->json[0] == '\"');
     unsigned uh = 0, ul = 0;
     const char* p = c->json;
     ++p;
     while (true) {
         char ch = *p++;
         switch (ch) {
-            case '\"':
-                lit_set_string(v, c->str);
-                c->str.clear();
-                c->json = p;
-                return LIT_PARSE_OK;
+            case '\"': c->json = p; return LIT_PARSE_OK;
             case '\\':
                 switch (*p++) {
-                    case '\"': c->str.push_back('\"'); break;
-                    case '\\': c->str.push_back('\\'); break;
-                    case '/': c->str.push_back('/'); break;
-                    case 'b': c->str.push_back('\b'); break;
-                    case 'f': c->str.push_back('\f'); break;
-                    case 'n': c->str.push_back('\n'); break;
-                    case 'r': c->str.push_back('\r'); break;
-                    case 't': c->str.push_back('\t'); break;
+                    case '\"': cache->push_back('\"'); break;
+                    case '\\': cache->push_back('\\'); break;
+                    case '/': cache->push_back('/'); break;
+                    case 'b': cache->push_back('\b'); break;
+                    case 'f': cache->push_back('\f'); break;
+                    case 'n': cache->push_back('\n'); break;
+                    case 'r': cache->push_back('\r'); break;
+                    case 't': cache->push_back('\t'); break;
                     case 'u':
-                        if (!(p = LitParseUnicode(p, &uh))) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
-                        if (uh >= 0xDC00 && uh <= 0xDFFF) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
+                        if (!(p = LitParseUnicode(p, &uh)))
+                            return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, cache);
+                        if (uh >= 0xDC00 && uh <= 0xDFFF) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, cache);
                         if (uh >= 0xD800 && uh <= 0xDBFF) {
-                            if (*p++ != '\\') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
-                            if (*p++ != 'u') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
+                            if (*p++ != '\\') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, cache);
+                            if (*p++ != 'u') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, cache);
                             if (!(p = LitParseUnicode(p, &ul)))
-                                return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, c);
+                                return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, cache);
                             if (ul < 0xDC00 || ul > 0xDFFF)
-                                return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, c);
+                                return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, cache);
                             uh = 0x10000 + (((uh - 0xD800) << 10) | (ul - 0xDC00));
                         }
-                        LitEncodeUTF8(c, uh);
+                        LitEncodeUTF8(cache, uh);
                         break;
                     default: return LIT_PARSE_INVALID_STRING_ESCAPE;
                 }
                 break;
-            case '\0': return DealStringError(LIT_PARSE_MISS_QUOTATION_MARK, c);
+            case '\0': return DealStringError(LIT_PARSE_MISS_QUOTATION_MARK, cache);
             default:
-                if (static_cast<unsigned char>(ch) < 0x20) return DealStringError(LIT_PARSE_INVALID_STRING_CHAR, c);
-                c->str.push_back(ch);
+                if (static_cast<unsigned char>(ch) < 0x20) return DealStringError(LIT_PARSE_INVALID_STRING_CHAR, cache);
+                cache->push_back(ch);
         }
     }
 }
@@ -228,31 +251,32 @@ const char* LitJson::LitParseUnicode(const char* p, unsigned int* u) {
     return p;
 }
 
-void LitJson::LitEncodeUTF8(LitContext* c, unsigned int u) {
+void LitJson::LitEncodeUTF8(std::string* cache, unsigned int u) {
     if (u <= 0x7F) {
-        c->str.push_back(u);
+        cache->push_back(u);
     } else if (u <= 0x7FF) {
-        c->str.push_back(0xC0 | ((u >> 6) & 0xFF));
-        c->str.push_back(0x80 | (u & 0x3F));
+        cache->push_back(0xC0 | ((u >> 6) & 0xFF));
+        cache->push_back(0x80 | (u & 0x3F));
     } else if (u <= 0xFFFF) {
-        c->str.push_back(0xE0 | ((u >> 12) & 0xFF));
-        c->str.push_back(0x80 | ((u >> 6) & 0x3F));
-        c->str.push_back(0x80 | (u & 0x3F));
+        cache->push_back(0xE0 | ((u >> 12) & 0xFF));
+        cache->push_back(0x80 | ((u >> 6) & 0x3F));
+        cache->push_back(0x80 | (u & 0x3F));
     } else {
         assert(u <= 0x10FFFF);
-        c->str.push_back(0xF0 | ((u >> 18) & 0xFF));
-        c->str.push_back(0x80 | ((u >> 12) & 0x3F));
-        c->str.push_back(0x80 | ((u >> 6) & 0x3F));
-        c->str.push_back(0x80 | (u & 0x3F));
+        cache->push_back(0xF0 | ((u >> 18) & 0xFF));
+        cache->push_back(0x80 | ((u >> 12) & 0x3F));
+        cache->push_back(0x80 | ((u >> 6) & 0x3F));
+        cache->push_back(0x80 | (u & 0x3F));
     }
 }
 
 ParseResultType LitJson::LitParseArray(LitContext* c, LitValue* v) {
-    assert(c->json[0] == '[');
+    assert(c != nullptr && c->json[0] == '[');
     ++c->json;
     LitParseWhitespace(c);
     if (*c->json == ']') {
         ++c->json;
+        // bug to be fixing, assign empty array to v
         v->type = LIT_ARRAY;
         return LIT_PARSE_OK;
     }
@@ -278,7 +302,46 @@ ParseResultType LitJson::LitParseArray(LitContext* c, LitValue* v) {
     }
 }
 
+ParseResultType LitJson::LitParseObject(LitContext* c, LitValue* v) {
+    assert(c != nullptr && c->json[0] == '{');
+    ++c->json;
+    LitParseWhitespace(c);
+    if (*c->json == '}') {
+        ++c->json;
+        // bug to be fixing, assign empty array to v
+        v->type = LIT_OBJECT;
+        return LIT_PARSE_OK;
+    }
+
+    LitValue::Obj aux;
+    ParseResultType res = LIT_PARSE_INVALID_VALUE;
+    while (true) {
+        std::string key;
+        LitValue value;
+        if (*c->json != '\"') return LIT_PARSE_MISS_KEY;
+        if ((res = LitParseStringRaw(c, &key)) != LIT_PARSE_OK) return res;
+        LitParseWhitespace(c);
+        if (*c->json != ':') return LIT_PARSE_MISS_COLON;
+        ++c->json;
+        LitParseWhitespace(c);
+        if ((res = LitParseValue(c, &value)) != LIT_PARSE_OK) return res;
+        aux.push_back({key, value});
+        LitParseWhitespace(c);
+        if (*c->json == ',') {
+            ++c->json;
+            LitParseWhitespace(c);
+        } else if (*c->json == '}') {
+            ++c->json;
+            lit_set_object(v, aux);
+            return LIT_PARSE_OK;
+        } else {
+            return LIT_PARSE_MISS_COMMA_OR_CURLY_BRACKET;
+        }
+    }
+}
+
 ParseResultType LitJson::LitParseValue(LitContext* c, LitValue* v) {
+    assert(c != nullptr);
     switch (*c->json) {
         case 'n': return LitParseNull(c, v);
         case 't': return LitParseTrue(c, v);
@@ -286,6 +349,7 @@ ParseResultType LitJson::LitParseValue(LitContext* c, LitValue* v) {
         case '\"': return LitParseString(c, v);
         case '\0': return LIT_PARSE_EXPECT_VALUE;
         case '[': return LitParseArray(c, v);
+        case '{': return LitParseObject(c, v);
         default: return LitParseNumber(c, v);
     }
 }
@@ -346,13 +410,11 @@ void LitJson::lit_set_string(LitValue* v, const std::string& s) {
 }
 
 LitValue& LitJson::lit_get_array_element(LitValue& v, size_t index) {
-    assert(v.type == LIT_ARRAY);
-    assert(index < v.arr.size());
+    assert(v.type == LIT_ARRAY && index < v.arr.size());
     return v.arr[index];
 }
 const LitValue& LitJson::lit_get_array_element(const LitValue& v, size_t index) {
-    assert(v.type == LIT_ARRAY);
-    assert(index < v.arr.size());
+    assert(v.type == LIT_ARRAY && index < v.arr.size());
     return v.arr[index];
 }
 
@@ -363,4 +425,25 @@ size_t LitJson::lit_get_array_size(const LitValue& v) {
 void LitJson::lit_set_array(LitValue* v, const std::vector<LitValue>& a) {
     assert(v != nullptr);
     *v = a;
+}
+
+size_t LitJson::lit_get_object_size(const LitValue& v) {
+    assert(v.type == LIT_OBJECT);
+    return v.obj.size();
+}
+const std::string& LitJson::lit_get_object_key(const LitValue& v, size_t index) {
+    assert(v.type == LIT_OBJECT && index < v.obj.size());
+    return v.obj[index].first;
+}
+size_t LitJson::lit_get_object_key_length(const LitValue& v, size_t index) {
+    assert(v.type == LIT_OBJECT && index < v.obj.size());
+    return v.obj[index].first.size();
+}
+LitValue& LitJson::lit_get_object_value(LitValue& v, size_t index) {
+    assert(v.type == LIT_OBJECT && index < v.obj.size());
+    return v.obj[index].second;
+}
+void LitJson::lit_set_object(LitValue* v, const LitValue::Obj& obj) {
+    assert(v != nullptr);
+    *v = obj;
 }

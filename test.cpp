@@ -142,6 +142,21 @@ static void TestParseArray() {
     CHECK_EQ(LIT_TRUE, lit.lit_get_type(lit.lit_get_array_element(v, 2)));
     CHECK_EQ(LIT_NUMBER, lit.lit_get_type(lit.lit_get_array_element(v, 3)));
     CHECK_EQ(LIT_STRING, lit.lit_get_type(lit.lit_get_array_element(v, 4)));
+
+    lit.lit_set_null(&v);
+    CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "[ [ ] , [ 0 ] , [ 0 , 1 ] , [ 0 , 1 , 2 ] ]"));
+    CHECK_EQ(LIT_ARRAY, lit.lit_get_type(v));
+    CHECK_EQ(static_cast<size_t>(4), lit.lit_get_array_size(v));
+    for (int i = 0; i < 4; ++i) {
+        LitValue ele = lit.lit_get_array_element(v, i);
+        CHECK_EQ(LIT_ARRAY, lit.lit_get_type(ele));
+        CHECK_EQ(static_cast<size_t>(i), lit.lit_get_array_size(ele));
+        for (int j = 0; j < i; ++j) {
+            LitValue num = lit.lit_get_array_element(ele, j);
+            CHECK_EQ(LIT_NUMBER, lit.lit_get_type(num));
+            CHECK_EQ(static_cast<double>(j), lit.lit_get_number(num));
+        }
+    }
 }
 
 static void TestParseExpectValue() {
@@ -155,6 +170,7 @@ static void TestParseInvalidValue() {
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "fale");
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "tre");
 
+    // invalid number
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "+0");  // positive sign is not allowed
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "+1");
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, ".123");  // at least one digit before '.'
@@ -163,6 +179,10 @@ static void TestParseInvalidValue() {
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "inf");
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "NAN");
     CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "nan");
+
+    // invalid value in array
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "[1,]");
+    CHECK_ERROR(LIT_PARSE_INVALID_VALUE, "[\"a\", nul]");
 }
 
 static void TestParseRootNotSingular() {
@@ -223,6 +243,36 @@ static void TestParseInvalidUnicodeSurrogate() {
     CHECK_ERROR(LIT_PARSE_INVALID_UNICODE_SURROGATE, "\"\\uD800\\uE000\"");
 }
 
+static void TestParseMissCommaOrSquareBracket() {
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1");
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1, \"abc\"");
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[1}");
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_SQUARE_BRACKET, "[[]");
+}
+
+static void TestParseMissKey() {
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{:1,");
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{1:1,");
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{true:1,");
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{false:1,");
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{null:1,");
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{[]:1,");
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{{}:1,");
+    CHECK_ERROR(LIT_PARSE_MISS_KEY, "{\"a\":1,");
+}
+
+static void TestParseMissColon() {
+    CHECK_ERROR(LIT_PARSE_MISS_COLON, "{\"a\"}");
+    CHECK_ERROR(LIT_PARSE_MISS_COLON, "{\"a\",\"b\"}");
+}
+
+static void TestParseMissCommaOrCurlyBracket() {
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1");
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1]");
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":1 \"b\"");
+    CHECK_ERROR(LIT_PARSE_MISS_COMMA_OR_CURLY_BRACKET, "{\"a\":{}");
+}
+
 static void TestAccessNull() {
     LitValue v;
     lit.lit_set_string(&v, "access null");
@@ -272,6 +322,10 @@ static void TestParse() {
     TestParseInvalidStringChar();
     TestParseInValidUnicodeHex();
     TestParseInvalidUnicodeSurrogate();
+    TestParseMissCommaOrSquareBracket();
+    TestParseMissKey();
+    TestParseMissColon();
+    TestParseMissCommaOrCurlyBracket();
 
     // test access/memory management
     TestAccessNull();
