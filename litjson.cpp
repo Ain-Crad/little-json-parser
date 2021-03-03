@@ -8,50 +8,49 @@
 #include <iostream>
 
 // parse
-void LitJson::LitParseWhitespace(LitContext* c) {
-    const char* p = c->json;
-    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') ++p;
-    c->json = p;
+void LitJson::LitParseWhitespace() {
+    assert(cur != nullptr);
+    while (*cur == ' ' || *cur == '\t' || *cur == '\n' || *cur == '\r') ++cur;
 }
 
-ParseResultType LitJson::LitParseNull(LitContext* c, LitValue* v) {
-    assert(c != nullptr && c->json[0] == 'n');
-    if (c->json[1] != 'u' || c->json[2] != 'l' || c->json[3] != 'l') {
+ParseResultType LitJson::LitParseNull(LitValue* v) {
+    assert(cur != nullptr && cur[0] == 'n');
+    if (cur[1] != 'u' || cur[2] != 'l' || cur[3] != 'l') {
         return LIT_PARSE_INVALID_VALUE;
     }
 
-    c->json += 4;
+    cur += 4;
 
     lit_set_null(v);
     return LIT_PARSE_OK;
 }
 
-ParseResultType LitJson::LitParseTrue(LitContext* c, LitValue* v) {
-    assert(c != nullptr && c->json[0] == 't');
-    if (c->json[1] != 'r' || c->json[2] != 'u' || c->json[3] != 'e') {
+ParseResultType LitJson::LitParseTrue(LitValue* v) {
+    assert(cur != nullptr && cur[0] == 't');
+    if (cur[1] != 'r' || cur[2] != 'u' || cur[3] != 'e') {
         return LIT_PARSE_INVALID_VALUE;
     }
 
-    c->json += 4;
+    cur += 4;
 
     lit_set_boolean(v, true);
     return LIT_PARSE_OK;
 }
 
-ParseResultType LitJson::LitParseFalse(LitContext* c, LitValue* v) {
-    assert(c != nullptr && c->json[0] == 'f');
-    if (c->json[1] != 'a' || c->json[2] != 'l' || c->json[3] != 's' || c->json[4] != 'e') {
+ParseResultType LitJson::LitParseFalse(LitValue* v) {
+    assert(cur != nullptr && cur[0] == 'f');
+    if (cur[1] != 'a' || cur[2] != 'l' || cur[3] != 's' || cur[4] != 'e') {
         return LIT_PARSE_INVALID_VALUE;
     }
 
-    c->json += 5;
+    cur += 5;
 
     lit_set_boolean(v, false);
     return LIT_PARSE_OK;
 }
 
-ParseResultType LitJson::LitParseNumber(LitContext* c, LitValue* v) {
-    const char* p = c->json;
+ParseResultType LitJson::LitParseNumber(LitValue* v) {
+    const char* p = cur;
 
     // skip '-'
     if (*p == '-') ++p;
@@ -82,13 +81,13 @@ ParseResultType LitJson::LitParseNumber(LitContext* c, LitValue* v) {
     // check range error
     errno = 0;
 
-    lit_set_number(v, strtod(c->json, nullptr));
+    lit_set_number(v, strtod(cur, nullptr));
     if (errno == ERANGE && (v->n == HUGE_VAL || v->n == -HUGE_VAL)) {
         v->type = LIT_NULL;
         return LIT_PARSE_NUMBER_TOO_BIG;
     }
 
-    c->json = p;
+    cur = p;
     return LIT_PARSE_OK;
 }
 
@@ -97,24 +96,24 @@ ParseResultType DealStringError(ParseResultType t, std::string* buff) {
     return t;
 }
 
-ParseResultType LitJson::LitParseString(LitContext* c, LitValue* v) {
+ParseResultType LitJson::LitParseString(LitValue* v) {
     ParseResultType res;
     std::string buff;
-    if ((res = LitParseStringRaw(c, &buff)) == LIT_PARSE_OK) {
+    if ((res = LitParseStringRaw(&buff)) == LIT_PARSE_OK) {
         lit_set_string(v, buff);
     }
     return res;
 }
 
-ParseResultType LitJson::LitParseStringRaw(LitContext* c, std::string* buff) {
-    assert(c != nullptr && c->json[0] == '\"');
+ParseResultType LitJson::LitParseStringRaw(std::string* buff) {
+    assert(cur != nullptr && cur[0] == '\"');
     unsigned uh = 0, ul = 0;
-    const char* p = c->json;
+    const char* p = cur;
     ++p;
     while (true) {
         char ch = *p++;
         switch (ch) {
-            case '\"': c->json = p; return LIT_PARSE_OK;
+            case '\"': cur = p; return LIT_PARSE_OK;
             case '\\':
                 switch (*p++) {
                     case '\"': buff->push_back('\"'); break;
@@ -187,12 +186,12 @@ void LitJson::LitEncodeUTF8(std::string* buff, unsigned int u) {
     }
 }
 
-ParseResultType LitJson::LitParseArray(LitContext* c, LitValue* v) {
-    assert(c != nullptr && c->json[0] == '[');
-    ++c->json;
-    LitParseWhitespace(c);
-    if (*c->json == ']') {
-        ++c->json;
+ParseResultType LitJson::LitParseArray(LitValue* v) {
+    assert(cur != nullptr && cur[0] == '[');
+    ++cur;
+    LitParseWhitespace();
+    if (*cur == ']') {
+        ++cur;
         lit_set_array(v, {});
         return LIT_PARSE_OK;
     }
@@ -201,15 +200,15 @@ ParseResultType LitJson::LitParseArray(LitContext* c, LitValue* v) {
     ParseResultType res = LIT_PARSE_INVALID_VALUE;
     while (true) {
         LitValue t;
-        if ((res = LitParseValue(c, &t)) != LIT_PARSE_OK) return res;
+        if ((res = LitParseValue(&t)) != LIT_PARSE_OK) return res;
 
         aux.push_back(t);
-        LitParseWhitespace(c);
-        if (*c->json == ',') {
-            ++c->json;
-            LitParseWhitespace(c);
-        } else if (*c->json == ']') {
-            ++c->json;
+        LitParseWhitespace();
+        if (*cur == ',') {
+            ++cur;
+            LitParseWhitespace();
+        } else if (*cur == ']') {
+            ++cur;
             lit_set_array(v, aux);
             return LIT_PARSE_OK;
         } else {
@@ -218,12 +217,12 @@ ParseResultType LitJson::LitParseArray(LitContext* c, LitValue* v) {
     }
 }
 
-ParseResultType LitJson::LitParseObject(LitContext* c, LitValue* v) {
-    assert(c != nullptr && c->json[0] == '{');
-    ++c->json;
-    LitParseWhitespace(c);
-    if (*c->json == '}') {
-        ++c->json;
+ParseResultType LitJson::LitParseObject(LitValue* v) {
+    assert(cur != nullptr && cur[0] == '{');
+    ++cur;
+    LitParseWhitespace();
+    if (*cur == '}') {
+        ++cur;
         lit_set_object(v, {});
         return LIT_PARSE_OK;
     }
@@ -233,20 +232,20 @@ ParseResultType LitJson::LitParseObject(LitContext* c, LitValue* v) {
     while (true) {
         std::string key;
         LitValue value;
-        if (*c->json != '\"') return LIT_PARSE_MISS_KEY;
-        if ((res = LitParseStringRaw(c, &key)) != LIT_PARSE_OK) return res;
-        LitParseWhitespace(c);
-        if (*c->json != ':') return LIT_PARSE_MISS_COLON;
-        ++c->json;
-        LitParseWhitespace(c);
-        if ((res = LitParseValue(c, &value)) != LIT_PARSE_OK) return res;
+        if (*cur != '\"') return LIT_PARSE_MISS_KEY;
+        if ((res = LitParseStringRaw(&key)) != LIT_PARSE_OK) return res;
+        LitParseWhitespace();
+        if (*cur != ':') return LIT_PARSE_MISS_COLON;
+        ++cur;
+        LitParseWhitespace();
+        if ((res = LitParseValue(&value)) != LIT_PARSE_OK) return res;
         aux.push_back({key, value});
-        LitParseWhitespace(c);
-        if (*c->json == ',') {
-            ++c->json;
-            LitParseWhitespace(c);
-        } else if (*c->json == '}') {
-            ++c->json;
+        LitParseWhitespace();
+        if (*cur == ',') {
+            ++cur;
+            LitParseWhitespace();
+        } else if (*cur == '}') {
+            ++cur;
             lit_set_object(v, aux);
             return LIT_PARSE_OK;
         } else {
@@ -255,29 +254,28 @@ ParseResultType LitJson::LitParseObject(LitContext* c, LitValue* v) {
     }
 }
 
-ParseResultType LitJson::LitParseValue(LitContext* c, LitValue* v) {
-    assert(c != nullptr);
-    switch (*c->json) {
-        case 'n': return LitParseNull(c, v);
-        case 't': return LitParseTrue(c, v);
-        case 'f': return LitParseFalse(c, v);
-        case '\"': return LitParseString(c, v);
+ParseResultType LitJson::LitParseValue(LitValue* v) {
+    assert(cur != nullptr);
+    switch (*cur) {
+        case 'n': return LitParseNull(v);
+        case 't': return LitParseTrue(v);
+        case 'f': return LitParseFalse(v);
+        case '\"': return LitParseString(v);
         case '\0': return LIT_PARSE_EXPECT_VALUE;
-        case '[': return LitParseArray(c, v);
-        case '{': return LitParseObject(c, v);
-        default: return LitParseNumber(c, v);
+        case '[': return LitParseArray(v);
+        case '{': return LitParseObject(v);
+        default: return LitParseNumber(v);
     }
 }
 
 ParseResultType LitJson::LitParse(LitValue* v, const char* json) {
-    LitContext c;
     assert(v != nullptr);
-    c.json = json;
-    LitParseWhitespace(&c);
-    ParseResultType res = LitParseValue(&c, v);
+    cur = json;
+    LitParseWhitespace();
+    ParseResultType res = LitParseValue(v);
     if (res == LIT_PARSE_OK) {
-        LitParseWhitespace(&c);
-        if (*c.json != '\0') {
+        LitParseWhitespace();
+        if (*cur != '\0') {
             v->type = LIT_NULL;
             res = LIT_PARSE_ROOT_NOT_SINGULAR;
         }

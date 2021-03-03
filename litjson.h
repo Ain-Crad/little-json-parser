@@ -6,10 +6,6 @@
 
 #include "LitValue.h"
 
-struct LitContext {
-    const char* json;
-};
-
 enum ParseResultType {
     LIT_PARSE_OK = 0,
     LIT_PARSE_EXPECT_VALUE,
@@ -64,22 +60,24 @@ public:
 
 private:
     // parse
-    void LitParseWhitespace(LitContext* c);
-    ParseResultType LitParseNull(LitContext* c, LitValue* v);
-    ParseResultType LitParseTrue(LitContext* c, LitValue* v);
-    ParseResultType LitParseFalse(LitContext* c, LitValue* v);
-    ParseResultType LitParseValue(LitContext* c, LitValue* v);
-    ParseResultType LitParseNumber(LitContext* c, LitValue* v);
-    ParseResultType LitParseStringRaw(LitContext* c, std::string* buff);
-    ParseResultType LitParseString(LitContext* c, LitValue* v);
-    ParseResultType LitParseArray(LitContext* c, LitValue* v);
-    ParseResultType LitParseObject(LitContext* c, LitValue* v);
+    void LitParseWhitespace();
+    ParseResultType LitParseNull(LitValue* v);
+    ParseResultType LitParseTrue(LitValue* v);
+    ParseResultType LitParseFalse(LitValue* v);
+    ParseResultType LitParseValue(LitValue* v);
+    ParseResultType LitParseNumber(LitValue* v);
+    ParseResultType LitParseStringRaw(std::string* buff);
+    ParseResultType LitParseString(LitValue* v);
+    ParseResultType LitParseArray(LitValue* v);
+    ParseResultType LitParseObject(LitValue* v);
     const char* LitParseUnicode(const char* p, unsigned int* u);
     void LitEncodeUTF8(std::string* buff, unsigned int u);
 
     // stringify
     void LitStringifyValue(const LitValue& v, std::string* res);
     void LitStringifyString(const std::string& str, std::string* res);
+
+    const char* cur = nullptr;
 };
 
 #endif
