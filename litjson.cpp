@@ -174,21 +174,21 @@ ParseResultType LitJson::LitParseNumber(LitContext* c, LitValue* v) {
     return LIT_PARSE_OK;
 }
 
-ParseResultType DealStringError(ParseResultType t, std::string* cache) {
-    cache->clear();
+ParseResultType DealStringError(ParseResultType t, std::string* buff) {
+    buff->clear();
     return t;
 }
 
 ParseResultType LitJson::LitParseString(LitContext* c, LitValue* v) {
     ParseResultType res;
-    std::string cache;
-    if ((res = LitParseStringRaw(c, &cache)) == LIT_PARSE_OK) {
-        lit_set_string(v, cache);
+    std::string buff;
+    if ((res = LitParseStringRaw(c, &buff)) == LIT_PARSE_OK) {
+        lit_set_string(v, buff);
     }
     return res;
 }
 
-ParseResultType LitJson::LitParseStringRaw(LitContext* c, std::string* cache) {
+ParseResultType LitJson::LitParseStringRaw(LitContext* c, std::string* buff) {
     assert(c != nullptr && c->json[0] == '\"');
     unsigned uh = 0, ul = 0;
     const char* p = c->json;
@@ -199,36 +199,35 @@ ParseResultType LitJson::LitParseStringRaw(LitContext* c, std::string* cache) {
             case '\"': c->json = p; return LIT_PARSE_OK;
             case '\\':
                 switch (*p++) {
-                    case '\"': cache->push_back('\"'); break;
-                    case '\\': cache->push_back('\\'); break;
-                    case '/': cache->push_back('/'); break;
-                    case 'b': cache->push_back('\b'); break;
-                    case 'f': cache->push_back('\f'); break;
-                    case 'n': cache->push_back('\n'); break;
-                    case 'r': cache->push_back('\r'); break;
-                    case 't': cache->push_back('\t'); break;
+                    case '\"': buff->push_back('\"'); break;
+                    case '\\': buff->push_back('\\'); break;
+                    case '/': buff->push_back('/'); break;
+                    case 'b': buff->push_back('\b'); break;
+                    case 'f': buff->push_back('\f'); break;
+                    case 'n': buff->push_back('\n'); break;
+                    case 'r': buff->push_back('\r'); break;
+                    case 't': buff->push_back('\t'); break;
                     case 'u':
-                        if (!(p = LitParseUnicode(p, &uh)))
-                            return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, cache);
-                        if (uh >= 0xDC00 && uh <= 0xDFFF) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, cache);
+                        if (!(p = LitParseUnicode(p, &uh))) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, buff);
+                        if (uh >= 0xDC00 && uh <= 0xDFFF) return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, buff);
                         if (uh >= 0xD800 && uh <= 0xDBFF) {
-                            if (*p++ != '\\') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, cache);
-                            if (*p++ != 'u') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, cache);
+                            if (*p++ != '\\') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, buff);
+                            if (*p++ != 'u') return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, buff);
                             if (!(p = LitParseUnicode(p, &ul)))
-                                return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, cache);
+                                return DealStringError(LIT_PARSE_INVALID_UNICODE_HEX, buff);
                             if (ul < 0xDC00 || ul > 0xDFFF)
-                                return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, cache);
+                                return DealStringError(LIT_PARSE_INVALID_UNICODE_SURROGATE, buff);
                             uh = 0x10000 + (((uh - 0xD800) << 10) | (ul - 0xDC00));
                         }
-                        LitEncodeUTF8(cache, uh);
+                        LitEncodeUTF8(buff, uh);
                         break;
                     default: return LIT_PARSE_INVALID_STRING_ESCAPE;
                 }
                 break;
-            case '\0': return DealStringError(LIT_PARSE_MISS_QUOTATION_MARK, cache);
+            case '\0': return DealStringError(LIT_PARSE_MISS_QUOTATION_MARK, buff);
             default:
-                if (static_cast<unsigned char>(ch) < 0x20) return DealStringError(LIT_PARSE_INVALID_STRING_CHAR, cache);
-                cache->push_back(ch);
+                if (static_cast<unsigned char>(ch) < 0x20) return DealStringError(LIT_PARSE_INVALID_STRING_CHAR, buff);
+                buff->push_back(ch);
         }
     }
 }
@@ -251,22 +250,22 @@ const char* LitJson::LitParseUnicode(const char* p, unsigned int* u) {
     return p;
 }
 
-void LitJson::LitEncodeUTF8(std::string* cache, unsigned int u) {
+void LitJson::LitEncodeUTF8(std::string* buff, unsigned int u) {
     if (u <= 0x7F) {
-        cache->push_back(u);
+        buff->push_back(u);
     } else if (u <= 0x7FF) {
-        cache->push_back(0xC0 | ((u >> 6) & 0xFF));
-        cache->push_back(0x80 | (u & 0x3F));
+        buff->push_back(0xC0 | ((u >> 6) & 0xFF));
+        buff->push_back(0x80 | (u & 0x3F));
     } else if (u <= 0xFFFF) {
-        cache->push_back(0xE0 | ((u >> 12) & 0xFF));
-        cache->push_back(0x80 | ((u >> 6) & 0x3F));
-        cache->push_back(0x80 | (u & 0x3F));
+        buff->push_back(0xE0 | ((u >> 12) & 0xFF));
+        buff->push_back(0x80 | ((u >> 6) & 0x3F));
+        buff->push_back(0x80 | (u & 0x3F));
     } else {
         assert(u <= 0x10FFFF);
-        cache->push_back(0xF0 | ((u >> 18) & 0xFF));
-        cache->push_back(0x80 | ((u >> 12) & 0x3F));
-        cache->push_back(0x80 | ((u >> 6) & 0x3F));
-        cache->push_back(0x80 | (u & 0x3F));
+        buff->push_back(0xF0 | ((u >> 18) & 0xFF));
+        buff->push_back(0x80 | ((u >> 12) & 0x3F));
+        buff->push_back(0x80 | ((u >> 6) & 0x3F));
+        buff->push_back(0x80 | (u & 0x3F));
     }
 }
 
@@ -276,8 +275,7 @@ ParseResultType LitJson::LitParseArray(LitContext* c, LitValue* v) {
     LitParseWhitespace(c);
     if (*c->json == ']') {
         ++c->json;
-        // bug to be fixing, assign empty array to v
-        v->type = LIT_ARRAY;
+        lit_set_array(v, {});
         return LIT_PARSE_OK;
     }
 
@@ -308,8 +306,7 @@ ParseResultType LitJson::LitParseObject(LitContext* c, LitValue* v) {
     LitParseWhitespace(c);
     if (*c->json == '}') {
         ++c->json;
-        // bug to be fixing, assign empty array to v
-        v->type = LIT_OBJECT;
+        lit_set_object(v, {});
         return LIT_PARSE_OK;
     }
 
@@ -446,4 +443,67 @@ LitValue& LitJson::lit_get_object_value(LitValue& v, size_t index) {
 void LitJson::lit_set_object(LitValue* v, const LitValue::Obj& obj) {
     assert(v != nullptr);
     *v = obj;
+}
+
+std::string LitJson::LitStringify(const LitValue& v) {
+    std::string res;
+    LitStringifyValue(v, &res);
+    return res;
+}
+
+void LitJson::LitStringifyValue(const LitValue& v, std::string* res) {
+    switch (v.type) {
+        case LIT_NULL: *res += "null"; break;
+        case LIT_FALSE: *res += "false"; break;
+        case LIT_TRUE: *res += "true"; break;
+        case LIT_NUMBER:
+            char buff[32];
+            sprintf(buff, "%.17g", v.n);
+            *res += buff;
+            break;
+        case LIT_STRING: LitStringifyString(v.str, res); break;
+        case LIT_ARRAY:
+            res->push_back('[');
+            for (int i = 0; i < v.arr.size(); ++i) {
+                if (i > 0) res->push_back(',');
+                LitStringifyValue(v.arr[i], res);
+            }
+            res->push_back(']');
+            break;
+        case LIT_OBJECT:
+            res->push_back('{');
+            for (int i = 0; i < v.obj.size(); ++i) {
+                if (i > 0) res->push_back(',');
+                LitStringifyString(v.obj[i].first, res);
+                res->push_back(':');
+                LitStringifyValue(v.obj[i].second, res);
+            }
+            res->push_back('}');
+            break;
+    }
+}
+
+void LitJson::LitStringifyString(const std::string& str, std::string* res) {
+    res->push_back('\"');
+    for (int i = 0; i < str.size(); ++i) {
+        unsigned char ch = static_cast<unsigned char>(str[i]);
+        switch (ch) {
+            case '\"': *res += "\\\""; break;
+            case '\\': *res += "\\\\"; break;
+            case '\b': *res += "\\b"; break;
+            case '\f': *res += "\\f"; break;
+            case '\n': *res += "\\n"; break;
+            case '\r': *res += "\\r"; break;
+            case '\t': *res += "\\t"; break;
+            default:
+                if (ch < 0x20) {
+                    char buff[7] = {'\0'};
+                    sprintf(buff, "\\u%04X", ch);
+                    *res += buff;
+                } else {
+                    res->push_back(ch);
+                }
+        }
+    }
+    res->push_back('\"');
 }

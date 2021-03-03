@@ -42,7 +42,6 @@ private:
 
 struct LitContext {
     const char* json;
-    // std::string str;
 };
 
 enum ParseResultType {
@@ -67,6 +66,7 @@ public:
     LitJson() = default;
 
     ParseResultType LitParse(LitValue* v, const char* json);
+    std::string LitStringify(const LitValue& v);
 
     LitType lit_get_type(const LitValue& v);
 
@@ -94,18 +94,23 @@ public:
     void lit_set_object(LitValue* v, const LitValue::Obj& obj);
 
 private:
+    // parse
     void LitParseWhitespace(LitContext* c);
     ParseResultType LitParseNull(LitContext* c, LitValue* v);
     ParseResultType LitParseTrue(LitContext* c, LitValue* v);
     ParseResultType LitParseFalse(LitContext* c, LitValue* v);
     ParseResultType LitParseValue(LitContext* c, LitValue* v);
     ParseResultType LitParseNumber(LitContext* c, LitValue* v);
-    ParseResultType LitParseStringRaw(LitContext* c, std::string* cache);
+    ParseResultType LitParseStringRaw(LitContext* c, std::string* buff);
     ParseResultType LitParseString(LitContext* c, LitValue* v);
     ParseResultType LitParseArray(LitContext* c, LitValue* v);
     ParseResultType LitParseObject(LitContext* c, LitValue* v);
     const char* LitParseUnicode(const char* p, unsigned int* u);
-    void LitEncodeUTF8(std::string* cache, unsigned int u);
+    void LitEncodeUTF8(std::string* buff, unsigned int u);
+
+    // stringify
+    void LitStringifyValue(const LitValue& v, std::string* res);
+    void LitStringifyString(const std::string& str, std::string* res);
 };
 
 #endif

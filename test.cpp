@@ -159,6 +159,55 @@ static void TestParseArray() {
     }
 }
 
+static void TestParseObject() {
+    LitValue v;
+
+    lit.lit_set_null(&v);
+    CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v, "{ }"));
+    CHECK_EQ(LIT_OBJECT, lit.lit_get_type(v));
+    CHECK_EQ(static_cast<size_t>(0), lit.lit_get_object_size(v));
+
+    lit.lit_set_null(&v);
+    CHECK_EQ(LIT_PARSE_OK, lit.LitParse(&v,
+                                        " { "
+                                        "\"n\" : null , "
+                                        "\"f\" : false , "
+                                        "\"t\" : true , "
+                                        "\"i\" : 123 , "
+                                        "\"s\" : \"abc\", "
+                                        "\"a\" : [ 1, 2, 3 ],"
+                                        "\"o\" : { \"1\" : 1, \"2\" : 2, \"3\" : 3 }"
+                                        " } "));
+    CHECK_EQ(LIT_OBJECT, lit.lit_get_type(v));
+    CHECK_EQ(static_cast<size_t>(7), lit.lit_get_object_size(v));
+    CHECK_EQ(std::string("n"), lit.lit_get_object_key(v, 0));
+    CHECK_EQ(LIT_NULL, lit.lit_get_type(lit.lit_get_object_value(v, 0)));
+    CHECK_EQ(std::string("f"), lit.lit_get_object_key(v, 1));
+    CHECK_EQ(LIT_FALSE, lit.lit_get_type(lit.lit_get_object_value(v, 1)));
+    CHECK_EQ(std::string("t"), lit.lit_get_object_key(v, 2));
+    CHECK_EQ(LIT_TRUE, lit.lit_get_type(lit.lit_get_object_value(v, 2)));
+    CHECK_EQ(std::string("i"), lit.lit_get_object_key(v, 3));
+    CHECK_EQ(LIT_NUMBER, lit.lit_get_type(lit.lit_get_object_value(v, 3)));
+    CHECK_EQ(123.0, lit.lit_get_number(lit.lit_get_object_value(v, 3)));
+    CHECK_EQ(std::string("s"), lit.lit_get_object_key(v, 4));
+    CHECK_EQ(LIT_STRING, lit.lit_get_type(lit.lit_get_object_value(v, 4)));
+    CHECK_EQ(std::string("abc"), lit.lit_get_string(lit.lit_get_object_value(v, 4)));
+    CHECK_EQ(std::string("a"), lit.lit_get_object_key(v, 5));
+    CHECK_EQ(LIT_ARRAY, lit.lit_get_type(lit.lit_get_object_value(v, 5)));
+    for (int i = 0; i < 3; ++i) {
+        LitValue t = lit.lit_get_array_element(lit.lit_get_object_value(v, 5), i);
+        CHECK_EQ(LIT_NUMBER, lit.lit_get_type(t));
+        CHECK_EQ(i + 1.0, lit.lit_get_number(t));
+    }
+    CHECK_EQ(std::string("o"), lit.lit_get_object_key(v, 6));
+    CHECK_EQ(LIT_OBJECT, lit.lit_get_type(lit.lit_get_object_value(v, 6)));
+    LitValue t = lit.lit_get_object_value(v, 6);
+    for (int i = 0; i < 3; ++i) {
+        CHECK_EQ('1' + i, lit.lit_get_object_key(t, i)[0] + 0);
+        CHECK_EQ(1.0 + i, lit.lit_get_number(lit.lit_get_object_value(t, i)));
+    }
+}
+
 static void TestParseExpectValue() {
     CHECK_ERROR(LIT_PARSE_EXPECT_VALUE, "");
     CHECK_ERROR(LIT_PARSE_EXPECT_VALUE, " ");
@@ -311,6 +360,7 @@ static void TestParse() {
     TestParseNumber();
     TestParseString();
     TestParseArray();
+    TestParseObject();
 
     // test error
     TestParseExpectValue();
@@ -334,8 +384,72 @@ static void TestParse() {
     TestAccessString();
 }
 
+#define CHECK_ROUNDTRIP(json) CheckRoundTrip(json, __FILE__, __LINE__);
+
+static void CheckRoundTrip(const char *json, const char *file_name, int line_num) {
+    LitValue v;
+    lit.lit_set_null(&v);
+
+    CheckEquality(LIT_PARSE_OK, lit.LitParse(&v, json), file_name, line_num);
+    std::string res_json = lit.LitStringify(v);
+    CheckEquality(std::string(json), res_json, file_name, line_num);
+}
+
+static void TestStringifyNumber() {
+    CHECK_ROUNDTRIP("0");
+    CHECK_ROUNDTRIP("-0");
+    CHECK_ROUNDTRIP("1");
+    CHECK_ROUNDTRIP("-1");
+    CHECK_ROUNDTRIP("1.5");
+    CHECK_ROUNDTRIP("-1.5");
+    CHECK_ROUNDTRIP("3.25");
+    CHECK_ROUNDTRIP("1e+020");
+    CHECK_ROUNDTRIP("1.234e+020");
+    CHECK_ROUNDTRIP("1.234e-020");
+
+    CHECK_ROUNDTRIP("1.0000000000000002");      /* the smallest number > 1 */
+    CHECK_ROUNDTRIP("4.9406564584124654e-324"); /* minimum denormal */
+    CHECK_ROUNDTRIP("-4.9406564584124654e-324");
+    CHECK_ROUNDTRIP("2.2250738585072009e-308"); /* Max subnormal double */
+    CHECK_ROUNDTRIP("-2.2250738585072009e-308");
+    CHECK_ROUNDTRIP("2.2250738585072014e-308"); /* Min normal positive double */
+    CHECK_ROUNDTRIP("-2.2250738585072014e-308");
+    CHECK_ROUNDTRIP("1.7976931348623157e+308"); /* Max double */
+    CHECK_ROUNDTRIP("-1.7976931348623157e+308");
+}
+
+static void TestStringifyString() {
+    CHECK_ROUNDTRIP("\"\"");
+    CHECK_ROUNDTRIP("\"Hello\"");
+    CHECK_ROUNDTRIP("\"Hello\\nWorld\"");
+    CHECK_ROUNDTRIP("\"\\\" \\\\ / \\b \\f \\n \\r \\t\"");
+    CHECK_ROUNDTRIP("\"Hello\\u0000World\"");
+}
+
+static void TestStringifyArray() {
+    CHECK_ROUNDTRIP("[]");
+    CHECK_ROUNDTRIP("[null,false,true,123,\"abc\",[1,2,3]]");
+}
+
+static void TestStringifyObject() {
+    CHECK_ROUNDTRIP("{}");
+    CHECK_ROUNDTRIP(
+        "{\"n\":null,\"f\":false,\"t\":true,\"i\":123,\"s\":\"abc\",\"a\":[1,2,3],\"o\":{\"1\":1,\"2\":2,\"3\":3}}");
+}
+
+static void TestStringify() {
+    CHECK_ROUNDTRIP("null");
+    CHECK_ROUNDTRIP("false");
+    CHECK_ROUNDTRIP("true");
+    TestStringifyNumber();
+    TestStringifyString();
+    TestStringifyArray();
+    TestStringifyObject();
+}
+
 int main() {
     TestParse();
+    TestStringify();
 
     std::cout << test_pass << "/" << test_count;
     std::cout << std::fixed << std::setprecision(2) << " (" << test_pass * 100.0 / test_count << "%) passed"
